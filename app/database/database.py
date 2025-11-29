@@ -1,33 +1,58 @@
+# app/database/database.py
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from dotenv import load_dotenv, find_dotenv
-import logging
-import os
+from sqlalchemy import event
 
-# Load .env reliably by finding it in the project tree
-env_path = find_dotenv()
-if not env_path:
-    logging.warning(".env not found with find_dotenv(); ensure .env is in project root or set env vars externally")
+# 1) Carrega o .env da raiz do projeto
+BASE_DIR = Path(__file__).resolve().parents[2]  # .../finance-application
+ENV_FILE = BASE_DIR / ".env"
+load_dotenv(ENV_FILE)
+
+# 2) Lê a URL do banco (aqui o tipo já é str, não str|None)
+DATABASE_URL: str = os.environ["DATABASE_URL"]
+
+# 3) Configurações específicas por tipo de banco
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
 else:
-    load_dotenv(env_path)
+    # Postgres/Neon
+    connect_args = {"ssl": "require"}
 
-# configuracoes do log
-logging.basicConfig()
-logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+# 4) Engine assíncrono
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,                # log das queries
+    connect_args=connect_args
+)
 
-DB_URL = os.getenv("DATABASE_URL")
-if not DB_URL:
-    raise RuntimeError("DATABASE_URL not set. Check your .env or environment variables")
+# 5) Session async
+SessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
-engine = create_async_engine(DB_URL)
+# 6) Dependency injection para FastAPI
+async def get_session():
+    async with SessionLocal() as session:
+        yield session
 
-# create an async session factory
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+# 7) Criar tabelas (somente aqui, não na main)
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
 
-def get_session() -> AsyncSession:
-    """Return a new AsyncSession instance from the session factory.
+# 8) Ativar foreign_keys apenas para SQLite
+if DATABASE_URL.startswith("sqlite"):
 
-    Use as `async with get_session() as session:` or integrate as a FastAPI dependency.
-    """
-    return async_session()
+    @event.listens_for(engine.sync_engine, "connect")
+    def activate_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()

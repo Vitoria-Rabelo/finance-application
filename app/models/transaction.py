@@ -16,4 +16,3 @@ class Transaction(SQLModel, table=True):
     categoria: "Category" = Relationship(back_populates="transactions")
 
 Transaction.model_rebuild()
-

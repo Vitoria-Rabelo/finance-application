@@ -80,18 +80,36 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+    """Run migrations in 'online' mode'."""
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    # Use an AsyncEngine for projects using async drivers (eg. asyncpg)
     from sqlalchemy.ext.asyncio import create_async_engine
+
     url = config.get_main_option("sqlalchemy.url") or DATABASE_URL
     if url is None:
         raise RuntimeError("No database URL configured for Alembic (sqlalchemy.url or .env DATABASE_URL)")
-    async_engine = create_async_engine(url, poolclass=pool.NullPool)
+
+    # Engine async com SSL habilitado (necessário para Neon)
+    async_engine = create_async_engine(
+        url,
+        poolclass=pool.NullPool,
+        connect_args={"ssl": True},
+    )
+
+    def do_run_migrations(connection):
+        context.configure(connection=connection, target_metadata=target_metadata)
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+    import asyncio
+
+    async def run_async_migrations():
+        async with async_engine.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+
+    asyncio.run(run_async_migrations())
+
+
 
     def do_run_migrations(connection):
         context.configure(connection=connection, target_metadata=target_metadata)

@@ -1,3 +1,6 @@
+import app.models
+
+
 def main():
     print("Hello from finance-application!")
 

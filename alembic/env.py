@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import os
 
+# Load .env early so we can set or override alembic config.url
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_FILE = BASE_DIR / ".env"
 load_dotenv(ENV_FILE)
@@ -17,12 +18,6 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-
-# IMPORTAR TODOS OS MODELS
-from app.models.user import User
-from app.models.account import Account
-from app.models.transaction import Transaction
-from app.models.category import Category
 
 
 # this is the Alembic Config object, which provides
@@ -41,17 +36,18 @@ if not config.get_main_option("sqlalchemy.url") and DATABASE_URL:
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-from sqlmodel import SQLModel
 
 # Import application models so SQLModel.metadata is populated for autogenerate
 try:
-    from app.models import user, account, category, transaction  # noqa: F401
+    import app.models  # this module should import each model submodule
 except Exception:
     # if imports fail, continue — autogenerate may still work if metadata is set elsewhere
     pass
 
+# Now set the target metadata from SQLModel after models are imported
+from sqlmodel import SQLModel
 target_metadata = SQLModel.metadata
+
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

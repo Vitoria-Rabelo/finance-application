@@ -1,12 +1,28 @@
-from __future__ import annotations
+from typing import List, Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+from .links import UserCategoryLink 
 
+if TYPE_CHECKING:
+    from .user import User
+    from .transaction import Transaction
 
-class Category(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+class CategoryBase(SQLModel):
     nome: str
     tipo: str
-    usuario_id: int | None = Field(default=None, foreign_key="user.id")
 
-    usuario: "User" | None = Relationship(back_populates="categories")
-    transactions: list["Transaction"] = Relationship(back_populates="categoria")
+class Category(CategoryBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+
+    users: List["User"] = Relationship(back_populates="categories", link_model=UserCategoryLink)
+    
+    transactions: List["Transaction"] = Relationship(back_populates="categoria")
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryRead(CategoryBase):
+    id: int
+
+class CategoryUpdate(SQLModel):
+    nome: str | None = None
+    tipo: str | None = None

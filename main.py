@@ -1,9 +1,17 @@
-import app.models
+from fastapi import FastAPI
+from app.routers import users, transactions
+from app.routers import accounts, categories
 
+app = FastAPI(title="Finance Application - TP2")
 
-def main():
-    print("Hello from finance-application!")
+app.include_router(users.router)
+app.include_router(transactions.router)
+app.include_router(accounts.router)
+app.include_router(categories.router)
 
-
-if __name__ == "__main__":
-    main()
+@app.get("/")
+def health_check():
+    return {
+        "status": "API rodando com sucesso!",
+        "docs": "Acesse /docs para ver o Swagger"
+    }

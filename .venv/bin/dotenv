@@ -1,4 +1,4 @@
-#!/Users/vitoriarabelo/Desktop/finance-application/.venv/bin/python3
+#!/home/kaio/Documentos/ufc/persistencia/finance-application/.venv/bin/python
 # -*- coding: utf-8 -*-
 import sys
 from dotenv.__main__ import cli

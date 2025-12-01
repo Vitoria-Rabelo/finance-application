@@ -1,1 +1,45 @@
-Vitoria Rabelo Santiago:
+Vitoria Rabelo
+
+1. Inicialização do Projeto:
+* Iniciar o projeto com uv init.
+* Instalar dependências travadas ( fastapi, sqlmodel, uvicorn, alembic, asyncpg,
+aiosqlite, python-dotenv).
+
+2. Configuração do Banco (Async):
+* Criar database.py usando AsyncEngine.
+* Configurar o arquivo .env (comentando a URL do Postgres e deixando SQLite ativo ou vice-versa).
+* Crítico: Implementar o evento para ativar PRAGMA foreign_keys-ON no SQLite.
+
+3. Modelagem de Dados (SQLModel):
+* Criar as 3 Entidades baseadas no TPO.
+* Definir os relacionamentos: Relationship (back_populates=...).
+* Criar a tabela de associação para o relacionamento Many-to-Many.
+
+Kaio Pereira
+1. Migrações (Alembic):
+* Configurar o alembic.ini para ler a URL do banco de forma dinâmica (async).
+* Gerar a primeira migração ( alembic revision --autogenerate ) e garantir que o create_all não esteja na main.py.
+
+2. Rotas CRUD (Create, Read, Update, Delete):
+* Implementar routers para as entidades principais.
+* Usar apenas métodos Async ( await session.exec(...) ).
+* Usar select() e não strings puras ou métodos depreciados.
+
+3. Boas Práticas de Performance:
+* Nas rotas de leitura (GET by ID ou List), implementar options (joined load(...)) para
+trazer os relacionamentos em uma única consulta, conforme exigido.
+
+Priscila Holanda
+
+1. Tratamento de Exceções:
+* Criar tratamentos robustos:
+  • HTTP 404 : Quando ID não existe.
+  • HTTP 409/400: Erros de violação de chave única ou integridade.
+  • HTTP 500: Erros genéricos de banco.
+
+2. Documentação (Swagger):
+* Garantir que as rotas tenham summary, description e response_model corretos
+para aparecerem bonitos no /docs.
+
+* Gerar o arquivo divisao_tarefas.txt.
+* Verificar se o uv.lock está atualizado e excluir a .venv antes de zipar.

@@ -1,2 +1,27 @@
-.venv
+# --- Segurança (CRÍTICO) ---
 .env
+.env.local
+
+# --- Python / Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Ambiente Virtual ---
+.venv/
+venv/
+env/
+
+# --- Banco de Dados Local (SQLite) ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- IDEs / Editores ---
+.vscode/
+.idea/
+*.swp
+
+# --- Logs e Arquivos Temporários ---
+*.log
+.DS_Store

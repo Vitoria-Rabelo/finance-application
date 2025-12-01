@@ -1,199 +1,152 @@
-from datetime import date
-from typing import List
-
+from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select, func
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel import select, func, col
 from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session  # AJUSTE conforme seu projeto
-from app.models.user import User      # AJUSTE caminhos
-from app.models.category import Category
-from app.models.transaction import Transaction
+from app.database import get_session
+from app.models import User, Category, Transaction, Account
 
 router = APIRouter(
     prefix="/analytics",
     tags=["Analytics"],
 )
 
-# a) Consultas por ID (User e Transaction)
-
-@router.get("/users/{user_id}", response_model=User)
-async def get_user_by_id(
-    user_id: int,
+# ==========================================
+# 1. Search (Busca na Descrição)
+# ==========================================
+@router.get("/transactions/search", response_model=List[Transaction])
+async def search_transactions(
+    q: str,
     session: AsyncSession = Depends(get_session),
 ):
-    result = await session.exec(
-        select(User)
-        .where(User.id == user_id)
-        .options(
-            selectinload(User.transactions),
-            selectinload(User.categories),
-        )
-    )
-    user = result.first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    return user
+    if not q:
+        return []
+        
+    pattern = f"%{q}%"
+    # Busca case-insensitive
+    query = select(Transaction).where(col(Transaction.descricao).ilike(pattern))
+    result = await session.execute(query)
+    return result.scalars().all()
 
 
-@router.get("/transactions/{transaction_id}", response_model=Transaction)
-async def get_transaction_by_id(
-    transaction_id: int,
+# ==========================================
+# 2. Count Total Transactions
+# ==========================================
+@router.get("/transactions/count")
+async def count_transactions(
     session: AsyncSession = Depends(get_session),
 ):
-    result = await session.exec(
-        select(Transaction)
-        .where(Transaction.id == transaction_id)
-        .options(
-            selectinload(Transaction.user),
-            selectinload(Transaction.category),
-        )
-    )
-    transaction = result.first()
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transação não encontrada")
-    return transaction
+    query = select(func.count(Transaction.id))
+    result = await session.execute(query)
+    total = result.scalar()
+    return {"total_transactions": total or 0}
 
 
-# b) Listar todas as transações de um determinado usuário
-
-@router.get("/users/{user_id}/transactions", response_model=List[Transaction])
-async def list_transactions_by_user(
-    user_id: int,
+# ==========================================
+# 3. Count by Category (Agregação)
+# ==========================================
+@router.get("/transactions/count-by-category")
+async def count_transactions_by_category(
     session: AsyncSession = Depends(get_session),
 ):
-    result = await session.exec(
-        select(Transaction)
-        .where(Transaction.user_id == user_id)
-        .options(selectinload(Transaction.category))
+    query = (
+        select(Category.nome, func.count(Transaction.id))
+        .join(Transaction, Transaction.categoria_id == Category.id, isouter=True)
+        .group_by(Category.nome)
     )
-    return result.all()
+    result = await session.execute(query)
+    rows = result.all()
+    
+    return [
+        {"category": row[0], "count": row[1]} 
+        for row in rows
+    ]
 
 
-# c) Listar todos os usuários de uma determinada categoria (N:N)
-
-@router.get("/categories/{category_id}/users", response_model=List[User])
-async def list_users_by_category(
-    category_id: int,
+# ==========================================
+# 4. Transactions per User (Agregação)
+# ==========================================
+@router.get("/users/transactions-count")
+async def count_transactions_per_user(
     session: AsyncSession = Depends(get_session),
 ):
-    result = await session.exec(
-        select(User)
-        .join(User.categories)
-        .where(Category.id == category_id)
-        .options(selectinload(User.categories))
+    query = (
+        select(User.nome, func.count(Transaction.id))
+        .join(Account, Account.usuario_id == User.id, isouter=True)
+        .join(Transaction, Transaction.conta_id == Account.id, isouter=True)
+        .group_by(User.nome)
     )
-    return result.all()
+    result = await session.execute(query)
+    rows = result.all()
+    
+    return [
+        {"user": row[0], "count": row[1]} 
+        for row in rows
+    ]
 
 
-# d) Listar transações de determinado ano
+# ==========================================
+# 5. Balanço Geral (Receitas vs Despesas) - NOVO 🚀
+# ==========================================
+@router.get("/balance-summary")
+async def get_balance_summary(
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Retorna o total de Receitas, Total de Despesas e o Saldo Líquido.
+    """
+    # 1. Calcular Total de Receitas
+    query_receitas = select(func.sum(Transaction.valor)).where(
+        col(Transaction.tipo).ilike("Receita") # ilike para garantir (receita/Receita)
+    )
+    result_receitas = await session.execute(query_receitas)
+    total_receitas = result_receitas.scalar() or 0.0
+
+    # 2. Calcular Total de Despesas
+    query_despesas = select(func.sum(Transaction.valor)).where(
+        col(Transaction.tipo).ilike("Despesa")
+    )
+    result_despesas = await session.execute(query_despesas)
+    total_despesas = result_despesas.scalar() or 0.0
+
+    # 3. Calcular Saldo
+    saldo = total_receitas - total_despesas
+
+    return {
+        "total_receitas": total_receitas,
+        "total_despesas": total_despesas,
+        "saldo_liquido": saldo,
+        "status": "No Azul" if saldo >= 0 else "No Vermelho"
+    }
+
+# ==========================================
+# Outros Endpoints Úteis (IDs, Ano, etc)
+# ==========================================
 
 @router.get("/transactions/by-year/{year}", response_model=List[Transaction])
 async def list_transactions_by_year(
     year: int,
     session: AsyncSession = Depends(get_session),
 ):
-    # Para SQLite: func.strftime
-    result = await session.exec(
-        select(Transaction).where(
-            func.strftime("%Y", Transaction.date) == str(year)
-        )
+    query = select(Transaction).where(
+        func.strftime("%Y", Transaction.data) == str(year)
     )
-    return result.all()
+    result = await session.execute(query)
+    return result.scalars().all()
 
+@router.get("/users/{user_id}", response_model=User)
+async def get_user_by_id(user_id: int, session: AsyncSession = Depends(get_session)):
+    query = select(User).where(User.id == user_id).options(selectinload(User.accounts), selectinload(User.categories))
+    result = await session.execute(query)
+    user = result.scalars().first()
+    if not user: raise HTTPException(status_code=404, detail="User not found")
+    return user
 
-# e) Busca por texto parcial na descrição
-
-@router.get("/transactions/search", response_model=List[Transaction])
-async def search_transactions(
-    q: str,
-    session: AsyncSession = Depends(get_session),
-):
-    pattern = f"%{q}%"
-    result = await session.exec(
-        select(Transaction).where(Transaction.description.ilike(pattern))
-    )
-    return result.all()
-
-
-# f) Exemplo: usuários criados em determinado ano (ou troque por outro campo de data)
-
-@router.get("/users/by-year/{year}", response_model=List[User])
-async def list_users_by_year(
-    year: int,
-    session: AsyncSession = Depends(get_session),
-):
-    # Ajuste o campo de data conforme o seu modelo (created_at, birth_date, etc.)
-    result = await session.exec(
-        select(User).where(
-            func.strftime("%Y", User.created_at) == str(year)
-        )
-    )
-    return result.all()
-
-
-# g) Quantidade total de transações
-
-@router.get("/transactions/count")
-async def count_transactions(
-    session: AsyncSession = Depends(get_session),
-):
-    result = await session.exec(select(func.count(Transaction.id)))
-    total = result.one()
-    return {"total_transactions": total}
-
-
-# h) Quantidade de transações por categoria
-
-@router.get("/transactions/count-by-category")
-async def count_transactions_by_category(
-    session: AsyncSession = Depends(get_session),
-):
-    result = await session.exec(
-        select(Category.name, func.count(Transaction.id))
-        .join(Transaction, Transaction.category_id == Category.id, isouter=True)
-        .group_by(Category.id, Category.name)
-        .order_by(Category.name)
-    )
-    rows = result.all()
-    return [
-        {"category": name, "total_transactions": count}
-        for name, count in rows
-    ]
-
-
-# i) Quantidade de transações por usuário
-
-@router.get("/users/transactions-count")
-async def count_transactions_per_user(
-    session: AsyncSession = Depends(get_session),
-):
-    result = await session.exec(
-        select(User.id, User.name, func.count(Transaction.id))
-        .join(Transaction, Transaction.user_id == User.id, isouter=True)
-        .group_by(User.id, User.name)
-        .order_by(User.name)
-    )
-    rows = result.all()
-    return [
-        {
-            "user_id": user_id,
-            "user_name": name,
-            "transactions": count,
-        }
-        for user_id, name, count in rows
-    ]
-
-
-# j) Transações com valor (amount) acima de certo mínimo
-
-@router.get("/transactions/min-value/{value}", response_model=List[Transaction])
-async def list_transactions_above_value(
-    value: float,
-    session: AsyncSession = Depends(get_session),
-):
-    result = await session.exec(
-        select(Transaction).where(Transaction.amount >= value)
-    )
-    return result.all()
+@router.get("/transactions/{transaction_id}", response_model=Transaction)
+async def get_transaction_by_id(transaction_id: int, session: AsyncSession = Depends(get_session)):
+    query = select(Transaction).where(Transaction.id == transaction_id).options(selectinload(Transaction.conta), selectinload(Transaction.categoria))
+    result = await session.execute(query)
+    transaction = result.scalars().first()
+    if not transaction: raise HTTPException(status_code=404, detail="Transaction not found")
+    return transaction

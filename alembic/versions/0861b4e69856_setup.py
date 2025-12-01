@@ -1,8 +1,8 @@
-"""many to many user category
+"""setup
 
-Revision ID: 32a2d3f445d3
+Revision ID: 0861b4e69856
 Revises: 
-Create Date: 2025-11-30 10:48:10.257926
+Create Date: 2025-12-01 08:44:02.429619
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = '32a2d3f445d3'
+revision: str = '0861b4e69856'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

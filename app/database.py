@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession   # ⬅️ IMPORTANTE: AsyncSession do SQLModel
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from dotenv import load_dotenv
 from pathlib import Path
 import os
@@ -15,15 +16,15 @@ if not DATABASE_URL:
 
 engine = create_async_engine(
     DATABASE_URL,
-    echo=True,
+    echo=False,
+    future=True,
 )
-
 
 # Session maker
 SessionLocal = async_sessionmaker(
     engine,
     expire_on_commit=False,
-    class_=AsyncSession
+    class_=AsyncSession,  # agora é o AsyncSession do SQLModel
 )
 
 

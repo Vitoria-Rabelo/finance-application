@@ -27,7 +27,7 @@ if "sqlite" not in DATABASE_URL:
 # 3. Criação da Engine
 engine = create_async_engine(
     DATABASE_URL,
-    echo=False, # Mude para True se quiser ver o SQL no terminal
+    echo=True, # Mude para True se quiser ver o SQL no terminal
     future=True,
     connect_args=connect_args, # Injeta os argumentos calculados acima
 )

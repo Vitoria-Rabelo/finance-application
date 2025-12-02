@@ -41,5 +41,8 @@ Priscila Holanda
 * Garantir que as rotas tenham summary, description e response_model corretos
 para aparecerem bonitos no /docs.
 
+3. Analytics
+* Reponsável por criar as consultas extras fora o CRUD.
+
 * Gerar o arquivo divisao_tarefas.txt.
 * Verificar se o uv.lock está atualizado e excluir a .venv antes de zipar.

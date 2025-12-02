@@ -2,7 +2,7 @@ from typing import List, Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
-    from .user import User
+    from .user import User, UserRead
     from .transaction import Transaction
 
 class Account(SQLModel, table=True):
@@ -29,8 +29,14 @@ class AccountCreate(AccountBase):
 
 class AccountRead(AccountBase):
     id: int
+    
+    usuario: Optional["UserRead"] = None
 
 class AccountUpdate(SQLModel):
     nome: str | None = None
     tipo: str | None = None
     saldo_inicial: float | None = None
+
+
+from .user import UserRead
+AccountRead.model_rebuild()

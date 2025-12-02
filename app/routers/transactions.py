@@ -18,15 +18,21 @@ async def create_transaction(transacao: TransactionCreate, session: AsyncSession
     await session.refresh(db_transacao)
     return db_transacao
 
+
 @router.get("/", response_model=list[TransactionRead])
-async def read_transactions(session: AsyncSession = Depends(get_session)):
-    # Aqui usamos o JOINEDLOAD como o professor pediu
+async def read_transactions(
+    session: AsyncSession = Depends(get_session),
+    offset: int = 0, 
+    limit: int = 10, 
+):
     query = select(Transaction).options(
-        joinedload(Transaction.conta),
+        joinedload(Transaction.conta).joinedload(Account.usuario),
         joinedload(Transaction.categoria)
-    )
+    ).offset(offset).limit(limit)
+    
     result = await session.execute(query)
     return result.scalars().all()
+
 
 @router.delete("/{id}")
 async def delete_transaction(id: int, session: AsyncSession = Depends(get_session)):

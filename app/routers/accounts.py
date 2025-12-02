@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from app.database import get_session
 from app.models import Account, AccountCreate, AccountRead, AccountUpdate
 
@@ -16,7 +17,9 @@ async def create_account(conta: AccountCreate, session: AsyncSession = Depends(g
 
 @router.get("/", response_model=list[AccountRead])
 async def read_accounts(session: AsyncSession = Depends(get_session)):
-    query = select(Account)
+    query = select(Account).options(
+        joinedload(Account.usuario)
+    )
     result = await session.execute(query)
     return result.scalars().all()
 

@@ -1,4 +1,4 @@
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from .links import UserCategoryLink
 
